@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Voronoi Map Generator (China Optimized)</title>
+    <title>Voronoi Map Generator</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -62,8 +62,8 @@
     
     <div class="w-96 h-full glass-panel z-20 flex flex-col border-r border-gray-200 shadow-xl overflow-y-auto absolute left-0 top-0">
         <div class="p-6">
-            <h1 class="text-2xl font-bold text-gray-800 mb-2">Voronoi Map 🛠️</h1>
-            <p class="text-sm text-gray-500 mb-6">基于 OSM/高德 的地理泰森多边形生成器</p>
+            <h1 class="text-2xl font-bold text-gray-800 mb-2">Voronoi Map 🌍</h1>
+            <p class="text-sm text-gray-500 mb-6">地理泰森多边形生成器</p>
 
             <div class="mb-6">
                 <h2 class="block text-sm font-bold text-gray-800 mb-3 border-l-4 border-indigo-600 pl-2">1. 地图数据源</h2>
@@ -183,6 +183,7 @@
 
     <div class="flex-1 relative bg-gray-100 ml-96">
         <div class="map-switch">
+            <!-- 修改：UI部分保持不变，逻辑通过 class 绑定自动处理 -->
             <div class="map-btn" :class="{active: mapType === 'OSM'}" @click="switchMapType('OSM')">OSM (WGS84)</div>
             <div class="map-btn" :class="{active: mapType === 'AMAP'}" @click="switchMapType('AMAP')">高德 (GCJ02)</div>
         </div>
@@ -276,7 +277,9 @@ createApp({
         const isLoading = ref(false);
         const resultImage = ref(null);
         const isDrawing = ref(false);
-        const mapType = ref('OSM'); // 默认使用 OSM
+        
+        // 修改：默认值由 'OSM' 改为 'AMAP'
+        const mapType = ref('AMAP'); 
         
         let map;
         let tileLayer;
@@ -297,11 +300,20 @@ createApp({
         const initLeafletMap = () => {
             map = L.map('leaflet-map').setView([35.0, 105.0], 4);
             
-            // 默认加载 OSM 瓦片
-            tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
-                attribution: '&copy; OpenStreetMap', 
-                maxZoom: 19 
-            }).addTo(map);
+            // 修改：判断当前默认模式，加载对应图层
+            if (mapType.value === 'AMAP') {
+                 // 默认加载高德地图瓦片
+                 tileLayer = L.tileLayer('http://webrd01.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
+                    attribution: '&copy; Gaode', 
+                    maxZoom: 19
+                }).addTo(map);
+            } else {
+                // 原有 OSM 逻辑
+                tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
+                    attribution: '&copy; OpenStreetMap', 
+                    maxZoom: 19 
+                }).addTo(map);
+            }
 
             markersGroup = L.layerGroup().addTo(map);
             drawnItems = L.featureGroup().addTo(map);
