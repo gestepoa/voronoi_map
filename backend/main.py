@@ -9,7 +9,7 @@ from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.concurrency import run_in_threadpool
 from algorithm import generate_voronoi_map
 
-app = FastAPI()
+app = FastAPI(root_path="/voronoi")
 
 # 允许跨域
 app.add_middleware(

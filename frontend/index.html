@@ -488,7 +488,7 @@ createApp({
             }
 
             try {
-                const response = await fetch("/generate-map", { method: "POST", body: formData });
+                const response = await fetch("./generate-map", { method: "POST", body: formData });
                 if (!response.ok) {
                     const err = await response.json();
                     throw new Error(err.detail || "请求失败");
