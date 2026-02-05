@@ -69,8 +69,18 @@
                 <h2 class="block text-sm font-bold text-gray-800 mb-3 border-l-4 border-indigo-600 pl-2">1. 地图数据源</h2>
                 <div class="mb-2">
                     <label class="block text-xs font-medium text-gray-600 mb-1">主底图 (GeoJSON / JSON)</label>
-                    <input type="file" ref="fileInput" @change="e => validateFile(e, fileInput)" accept=".json,.geojson" 
-                           class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+                    <!-- 修改：添加 Flex 布局和预览按钮 -->
+                    <div class="flex gap-2 items-center">
+                        <input type="file" ref="fileInput" @change="e => validateFile(e, fileInput)" accept=".json,.geojson" 
+                               class="block w-full text-sm text-gray-500 file:mr-2 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 min-w-0 flex-1"/>
+                        <!-- 修改：动态绑定文字、样式和Title -->
+                        <button @click="previewGeoJSON" 
+                                :title="isPreviewing ? '取消预览' : '在地图上显示上传的文件'" 
+                                :class="isPreviewing ? 'bg-gray-500 hover:bg-gray-600' : 'bg-green-500 hover:bg-green-600'"
+                                class="flex-shrink-0 px-4 py-1.5 text-white text-xs rounded shadow-sm transition active:scale-95 flex items-center justify-center font-medium min-w-[3.5rem]">
+                            {{ isPreviewing ? '取消' : '预览' }}
+                        </button>
+                    </div>
                 </div>
                 <div class="ml-4 pl-3 border-l-2 border-gray-200 mt-3">
                     <div class="flex items-center justify-between mb-2">
@@ -183,7 +193,6 @@
 
     <div class="flex-1 relative bg-gray-100 ml-96">
         <div class="map-switch">
-            <!-- 修改：UI部分保持不变，逻辑通过 class 绑定自动处理 -->
             <div class="map-btn" :class="{active: mapType === 'OSM'}" @click="switchMapType('OSM')">OSM (WGS84)</div>
             <div class="map-btn" :class="{active: mapType === 'AMAP'}" @click="switchMapType('AMAP')">高德 (GCJ02)</div>
         </div>
@@ -278,7 +287,6 @@ createApp({
         const resultImage = ref(null);
         const isDrawing = ref(false);
         
-        // 修改：默认值由 'OSM' 改为 'AMAP'
         const mapType = ref('AMAP'); 
         
         let map;
@@ -287,6 +295,11 @@ createApp({
         let markerInstances = [];
         let drawnItems; 
         let drawHandler;
+        
+        let previewLayer = null;
+        const rawGeoJSON = ref(null);
+        // 新增：预览状态标记
+        const isPreviewing = ref(false);
 
         onMounted(() => { initLeafletMap(); });
 
@@ -300,15 +313,12 @@ createApp({
         const initLeafletMap = () => {
             map = L.map('leaflet-map').setView([35.0, 105.0], 4);
             
-            // 修改：判断当前默认模式，加载对应图层
             if (mapType.value === 'AMAP') {
-                 // 默认加载高德地图瓦片
                  tileLayer = L.tileLayer('http://webrd01.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
                     attribution: '&copy; Gaode', 
                     maxZoom: 19
                 }).addTo(map);
             } else {
-                // 原有 OSM 逻辑
                 tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { 
                     attribution: '&copy; OpenStreetMap', 
                     maxZoom: 19 
@@ -332,11 +342,85 @@ createApp({
             });
         };
 
-        // 核心：切换地图图层
+        const drawPreviewLayer = () => {
+            if (!rawGeoJSON.value) return;
+
+            if (previewLayer) {
+                map.removeLayer(previewLayer);
+                previewLayer = null;
+            }
+
+            try {
+                const geoJSONOptions = {
+                    interactive: false, 
+                    style: { color: '#ff7800', weight: 2, opacity: 0.65, fillOpacity: 0.1 },
+                    pointToLayer: (feature, latlng) => {
+                        return L.circleMarker(latlng, { 
+                            radius: 6, 
+                            fillColor: "#ff7800", 
+                            color: "#000", 
+                            weight: 1, 
+                            opacity: 1, 
+                            fillOpacity: 0.8,
+                            interactive: false 
+                        });
+                    }
+                };
+
+                if (mapType.value === 'AMAP') {
+                    geoJSONOptions.coordsToLatLng = function(coords) {
+                        const [gcjLat, gcjLon] = wgs84togcj02(coords[1], coords[0]);
+                        return L.latLng(gcjLat, gcjLon);
+                    };
+                }
+
+                previewLayer = L.geoJSON(rawGeoJSON.value, geoJSONOptions).addTo(map);
+                map.fitBounds(previewLayer.getBounds());
+            } catch (err) {
+                console.error("绘制预览失败", err);
+                alert("绘制预览失败: " + err.message);
+            }
+        };
+
+        // 修改：将预览功能改为 Toggle (开关) 模式
+        const previewGeoJSON = () => {
+            // 1. 如果正在预览 -> 取消预览
+            if (isPreviewing.value) {
+                if (previewLayer) {
+                    map.removeLayer(previewLayer);
+                    previewLayer = null;
+                }
+                rawGeoJSON.value = null; // 清空数据，防止切图层时自动重绘
+                isPreviewing.value = false;
+                return;
+            }
+
+            // 2. 如果未预览 -> 开启预览
+            if (!fileInput.value || !fileInput.value.files[0]) {
+                alert("请先选择一个 GeoJSON/JSON 文件！");
+                return;
+            }
+
+            const file = fileInput.value.files[0];
+            const reader = new FileReader();
+            
+            reader.onload = (e) => {
+                try {
+                    const json = JSON.parse(e.target.result);
+                    rawGeoJSON.value = json; 
+                    drawPreviewLayer(); 
+                    isPreviewing.value = true; // 成功绘制后，设置状态为 true
+                } catch (err) {
+                    alert("文件解析失败，请确保是合法的 JSON/GeoJSON 格式！");
+                }
+            };
+            
+            reader.readAsText(file);
+        };
+
         const switchMapType = (type) => {
             if (mapType.value === type) return;
 
-            // 1. 切换底图
             if (tileLayer) map.removeLayer(tileLayer);
             
             if (type === 'OSM') {
@@ -344,39 +428,35 @@ createApp({
                     attribution: '&copy; OpenStreetMap', maxZoom: 19
                 }).addTo(map);
                 
-                // 2. 转换坐标: GCJ02 -> WGS84
                 convertCoordinates(gcj02towgs84);
 
             } else if (type === 'AMAP') {
-                // 高德地图瓦片 URL
                 tileLayer = L.tileLayer('http://webrd01.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
                     attribution: '&copy; Gaode', maxZoom: 19
                 }).addTo(map);
 
-                // 2. 转换坐标: WGS84 -> GCJ02
                 convertCoordinates(wgs84togcj02);
             }
 
             mapType.value = type;
+            
+            if (rawGeoJSON.value) {
+                drawPreviewLayer();
+            }
         };
 
-        // 批量转换点位和范围
         const convertCoordinates = (transformFunc) => {
-            // A. 转换点位
             points.value.forEach((p, index) => {
                 const [newLat, newLng] = transformFunc(p.lat, p.lng);
                 p.lat = parseFloat(newLat.toFixed(6));
                 p.lng = parseFloat(newLng.toFixed(6));
                 
-                // 同步更新地图上的 Marker
                 if (markerInstances[index]) {
                     markerInstances[index].setLatLng([newLat, newLng]);
                 }
             });
 
-            // B. 转换框选范围 (如果有值)
             if (manualBounds.minLon !== null) {
-                // 简单处理：只转换西南和东北两个角
                 const [minLat, minLon] = transformFunc(manualBounds.minLat, manualBounds.minLon);
                 const [maxLat, maxLon] = transformFunc(manualBounds.maxLat, manualBounds.maxLon);
                 
@@ -385,7 +465,6 @@ createApp({
                 manualBounds.maxLat = parseFloat(maxLat.toFixed(4));
                 manualBounds.maxLon = parseFloat(maxLon.toFixed(4));
 
-                // 如果地图上有框，重绘它
                 if (drawnItems.getLayers().length > 0) {
                     const rect = drawnItems.getLayers()[0];
                     rect.setBounds([
@@ -455,20 +534,16 @@ createApp({
             isLoading.value = true;
             const formData = new FormData();
             
-            // --- 核心：数据清洗 (统一转为 WGS-84 发送给后端) ---
-            let submitPoints = JSON.parse(JSON.stringify(points.value)); // 深拷贝
+            let submitPoints = JSON.parse(JSON.stringify(points.value)); 
             let submitBounds = {...manualBounds};
 
-            // 如果当前是高德模式 (GCJ02)，必须转回 WGS84
             if (mapType.value === 'AMAP') {
                 console.log("检测到高德模式，正在转换数据为 WGS84...");
-                // 转换点位
                 submitPoints.forEach(p => {
                     const [wgsLat, wgsLng] = gcj02towgs84(p.lat, p.lng);
                     p.lat = wgsLat;
                     p.lng = wgsLng;
                 });
-                // 转换范围
                 if (submitBounds.minLon !== null) {
                     const [minLat, minLon] = gcj02towgs84(submitBounds.minLat, submitBounds.minLon);
                     const [maxLat, maxLon] = gcj02towgs84(submitBounds.maxLat, submitBounds.maxLon);
@@ -477,7 +552,6 @@ createApp({
                 }
             }
 
-            // 发送数据
             const pointsArray = submitPoints.map(p => [p.lat, p.lng]);
             formData.append("points", JSON.stringify(pointsArray));
             const colorsArray = submitPoints.map(p => p.color);
@@ -517,9 +591,9 @@ createApp({
 
         return {
             points, manualBounds, fileInput, pluginInput, drawPlugin, fillOcean, resolution,
-            isLoading, resultImage, isDrawing, mapType,
+            isLoading, resultImage, isDrawing, mapType, isPreviewing,
             clearPoints, generateMap, enableDraw, resetExtent, validateFile, addPoint, updateMarkerPosition,
-            fillDefault, switchMapType
+            fillDefault, switchMapType, previewGeoJSON
         };
     }
 }).mount('#app');
