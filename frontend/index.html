@@ -68,12 +68,23 @@
             <div class="mb-6">
                 <h2 class="block text-sm font-bold text-gray-800 mb-3 border-l-4 border-indigo-600 pl-2">1. 地图数据源</h2>
                 <div class="mb-2">
-                    <label class="block text-xs font-medium text-gray-600 mb-1">主底图 (GeoJSON / JSON)</label>
-                    <!-- 修改：添加 Flex 布局和预览按钮 -->
+                    <!-- 修改：Flex 布局，将标签和下载链接放在同一行 -->
+                    <div class="flex justify-between items-center mb-1">
+                        <label class="block text-xs font-medium text-gray-600">主底图 (GeoJSON / JSON)</label>
+                        <!-- 新增：天地图下载链接 -->
+                        <a href="https://cloudcenter.tianditu.gov.cn/administrativeDivision/" target="_blank" 
+                           class="text-[10px] text-indigo-500 hover:text-indigo-700 flex items-center gap-1 transition-colors hover:underline" 
+                           title="前往天地图下载行政区划数据">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3 h-3">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                            </svg>
+                            天地图数据下载
+                        </a>
+                    </div>
+                    
                     <div class="flex gap-2 items-center">
                         <input type="file" ref="fileInput" @change="e => validateFile(e, fileInput)" accept=".json,.geojson" 
                                class="block w-full text-sm text-gray-500 file:mr-2 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 min-w-0 flex-1"/>
-                        <!-- 修改：动态绑定文字、样式和Title -->
                         <button @click="previewGeoJSON" 
                                 :title="isPreviewing ? '取消预览' : '在地图上显示上传的文件'" 
                                 :class="isPreviewing ? 'bg-gray-500 hover:bg-gray-600' : 'bg-green-500 hover:bg-green-600'"
